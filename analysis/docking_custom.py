@@ -185,7 +185,7 @@ def calculate_qvina2_score(receptor_file, sdf_file, out_dir, size=20,
 
             # run QuickVina 2
             out = os.popen(
-                f'qvina2.1 --receptor {receptor_pdbqt_file} '
+                f'./qvina/qvina2.1 --receptor {receptor_pdbqt_file} '
                 f'--ligand {ligand_pdbqt_file} '
                 f'--center_x {cx:.4f} --center_y {cy:.4f} --center_z {cz:.4f} '
                 f'--size_x {size} --size_y {size} --size_z {size} '
