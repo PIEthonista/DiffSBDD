@@ -9,7 +9,8 @@ from tqdm import tqdm
 import numpy as np
 import torch
 from Bio.PDB import PDBParser
-from Bio.PDB.Polypeptide import three_to_one, is_aa
+# from Bio.PDB.Polypeptide import three_to_one, is_aa
+from Bio.PDB.Polypeptide import three_to_index, index_to_one, is_aa
 from Bio.PDB import PDBIO, Select
 from openbabel import openbabel
 from rdkit import Chem
@@ -237,9 +238,13 @@ def process_ligand_and_pocket(pdb_struct, ligand_name, ligand_chain,
     if ca_only:
         pocket_coords = c_alpha
         try:
+            # pocket_one_hot = np.stack([
+            #     np.eye(1, len(amino_acid_dict),
+            #            amino_acid_dict[three_to_one(res.get_resname())]).squeeze()
+            #     for res in pocket_residues])
             pocket_one_hot = np.stack([
                 np.eye(1, len(amino_acid_dict),
-                       amino_acid_dict[three_to_one(res.get_resname())]).squeeze()
+                       amino_acid_dict[index_to_one(three_to_index(res.get_resname()))]).squeeze()
                 for res in pocket_residues])
         except KeyError as e:
             raise KeyError(
@@ -480,16 +485,21 @@ if __name__ == '__main__':
         pdb_sdf_dir.mkdir(exist_ok=True)
 
         n_tot = len(data_split[split])
+        # 4Y0D: [(RW2:A:502,), (RW2:B:501,), (RW2:C:503,), (RW2:D:501,)]
         pair_dict = ligand_list_to_dict(data_split[split])
 
         tic = time()
         num_failed = 0
         with tqdm(total=n_tot) as pbar:
+            # 1A0J
             for p in pair_dict:
+                print("=============")
+                print(f"P: {p}")
 
                 pdb_successful = set()
 
                 # try all available .bio files
+                # look for all files with name '1a0j.bio?'
                 for pdbfile in sorted(pdbdir.glob(f"{p.lower()}.bio*")):
 
                     # Skip if all ligands have been processed already
@@ -500,16 +510,21 @@ if __name__ == '__main__':
                     struct_copy = pdb_struct.copy()
 
                     n_bio_successful = 0
+                    # (RW2:A:502,)
                     for m in pair_dict[p]:
+                        print(f"M: {m}")
 
-                        # Skip already processed ligand
+                        # Skip already processed ligand (duplicates: ligands with >1 optimal docking positions)
+                        # RW2:A:502
                         if m[0] in pdb_successful:
                             continue
 
+                        # RW2        A             502
                         ligand_name, ligand_chain, ligand_resi = m[0].split(':')
                         ligand_resi = int(ligand_resi)
 
                         try:
+                            print(ligand_name, ligand_chain, ligand_resi)
                             ligand_data, pocket_data = process_ligand_and_pocket(
                                 pdb_struct, ligand_name, ligand_chain, ligand_resi,
                                 dist_cutoff=args.dist_cutoff, ca_only=args.ca_only)
@@ -554,7 +569,7 @@ if __name__ == '__main__':
                             obConversion.SetInAndOutFormats("xyz", "sdf")
                             mol = openbabel.OBMol()
                             obConversion.ReadFile(mol, str(xyz_file))
-                            xyz_file.unlink()
+                            xyz_file.unlink()    # equiv to os.remove(xyz_file)
 
                             name = f"{p}-{pdbfile.suffix[1:]}_{m[0]}"
                             sdf_file = Path(pdb_sdf_dir, f'{name}.sdf')

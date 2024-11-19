@@ -11,7 +11,8 @@ from tqdm import tqdm
 import numpy as np
 
 from Bio.PDB import PDBParser
-from Bio.PDB.Polypeptide import three_to_one, is_aa
+# from Bio.PDB.Polypeptide import three_to_one, is_aa
+from Bio.PDB.Polypeptide import three_to_index, index_to_one, is_aa
 from rdkit import Chem
 from scipy.ndimage import gaussian_filter
 
@@ -69,8 +70,10 @@ def process_ligand_and_pocket(pdbfile, sdffile,
             for res in pocket_residues:
                 for atom in res.get_atoms():
                     if atom.name == 'CA':
+                        # pocket_one_hot.append(np.eye(1, len(amino_acid_dict),
+                        #                              amino_acid_dict[three_to_one(res.get_resname())]).squeeze())
                         pocket_one_hot.append(np.eye(1, len(amino_acid_dict),
-                                                     amino_acid_dict[three_to_one(res.get_resname())]).squeeze())
+                                                     amino_acid_dict[index_to_one(three_to_index(res.get_resname()))]).squeeze())
                         full_coords.append(atom.coord)
             pocket_one_hot = np.stack(pocket_one_hot)
             full_coords = np.stack(full_coords)
@@ -310,6 +313,10 @@ if __name__ == '__main__':
 
             sdffile = datadir / f'{ligand_fn}'
             pdbfile = datadir / f'{pocket_fn}'
+            
+            print("===============")
+            print(sdffile)
+            print(pdbfile)
 
             try:
                 struct_copy = PDBParser(QUIET=True).get_structure('', pdbfile)
@@ -336,10 +343,12 @@ if __name__ == '__main__':
             lig_coords.append(ligand_data['lig_coords'])
             lig_one_hot.append(ligand_data['lig_one_hot'])
             lig_mask.append(count * np.ones(len(ligand_data['lig_coords'])))
+            
             pocket_coords.append(pocket_data['pocket_coords'])
             pocket_one_hot.append(pocket_data['pocket_one_hot'])
             pocket_mask.append(
                 count * np.ones(len(pocket_data['pocket_coords'])))
+            
             count_protein.append(pocket_data['pocket_coords'].shape[0])
             count_ligand.append(ligand_data['lig_coords'].shape[0])
             count_total.append(pocket_data['pocket_coords'].shape[0] +

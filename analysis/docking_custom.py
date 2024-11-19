@@ -15,6 +15,84 @@ except ModuleNotFoundError as e:
     print(e)
 
 
+from Bio.PDB import PDBParser
+def get_pocket_center(pdb_file):
+    """Calculate the geometric center of a pocket from a PDB file."""
+    parser = PDBParser(QUIET=True)
+    structure = parser.get_structure("pocket", pdb_file)
+    coordinates = []
+
+    # Extract atomic coordinates
+    for atom in structure.get_atoms():
+        coordinates.append(atom.coord)
+
+    # Calculate the geometric center
+    coordinates = np.array(coordinates)
+    center = np.mean(coordinates, axis=0)
+    return center
+
+def center_ligand(ligand):
+    """Center the ligand coordinates around (0, 0, 0)."""
+    conf = ligand.GetConformer()
+    coords = np.array([list(conf.GetAtomPosition(i)) for i in range(ligand.GetNumAtoms())])
+
+    # Calculate ligand's center
+    ligand_center = np.mean(coords, axis=0)
+    print(f">>> Ligand center beforehand: {ligand_center}")
+
+    # Translate coordinates to center the ligand at (0, 0, 0)
+    for i in range(ligand.GetNumAtoms()):
+        conf.SetAtomPosition(i, coords[i] - ligand_center)
+    
+    return ligand, ligand_center
+
+def translate_ligand_to_pocket_center(ligand, pocket_center):
+    """Translate the ligand to align its center with the pocket center and display the new center."""
+    # Get the conformer (3D coordinates) of the ligand
+    conf = ligand.GetConformer()
+    
+    # Iterate over each atom in the ligand
+    for i in range(ligand.GetNumAtoms()):
+        # Get the current position of the atom
+        current_pos = np.array(conf.GetAtomPosition(i))
+        
+        # Translate the atom position by adding the pocket center (move the ligand)
+        conf.SetAtomPosition(i, current_pos + pocket_center)
+
+    # Calculate the new center of the ligand after translation
+    new_center = np.mean([np.array(conf.GetAtomPosition(i)) for i in range(ligand.GetNumAtoms())], axis=0)
+    
+    # Display the new center (xyz coordinates)
+    print(f">>> Ligand center after: {new_center}")
+    
+    # Return the modified ligand with updated positions
+    return ligand
+
+def process_sdf_file(sdf_file, pocket_center):
+    """Read an SDF file, apply pocket center translation to each molecule, and overwrite the file."""
+    supplier = Chem.SDMolSupplier(sdf_file)
+    writer = Chem.SDWriter(sdf_file)
+
+    # Loop through all molecules in the SDF file
+    for mol in supplier:
+        if mol is not None:
+            # Step 1: Center ligand around (0, 0, 0)
+            mol, ligand_original_center = center_ligand(mol)
+
+            # Step 2: Translate ligand to the pocket center
+            mol = translate_ligand_to_pocket_center(mol, pocket_center)
+
+            # Step 3: Write the modified molecule back to the SDF file
+            writer.write(mol)
+
+    # Close the writer
+    writer.close()
+
+
+
+
+
+
 def calculate_smina_score(pdb_file, sdf_file):
     # add '-o <name>_smina.sdf' if you want to see the output
     out = os.popen(f'smina.static -l {sdf_file} -r {pdb_file} '
@@ -61,6 +139,20 @@ def calculate_qvina2_score(receptor_file, sdf_file, out_dir, size=20,
 
     receptor_file = Path(receptor_file)
     sdf_file = Path(sdf_file)
+
+
+# custom testing code
+# ===================================
+    # Get pocket center
+    pocket_center = get_pocket_center(receptor_file)
+    print(f"=========================================")
+    print(f">>> Pocket center: {pocket_center}")
+
+    # Process the SDF file
+    process_sdf_file(sdf_file, pocket_center)
+# ===================================
+
+
 
     if receptor_file.suffix == '.pdb':
         # prepare receptor, requires Python 2.7
