@@ -68,10 +68,10 @@ def translate_ligand_to_pocket_center(ligand, pocket_center):
     # Return the modified ligand with updated positions
     return ligand
 
-def process_sdf_file(sdf_file, pocket_center):
+def process_sdf_file(sdf_file_in, sdf_file_out, pocket_center):
     """Read an SDF file, apply pocket center translation to each molecule, and overwrite the file."""
-    supplier = Chem.SDMolSupplier(sdf_file)
-    writer = Chem.SDWriter(sdf_file)
+    supplier = Chem.SDMolSupplier(str(sdf_file_in), sanitize=False)
+    writer = Chem.SDWriter(str(sdf_file_out))
 
     # Loop through all molecules in the SDF file
     for mol in supplier:
@@ -81,6 +81,7 @@ def process_sdf_file(sdf_file, pocket_center):
 
             # Step 2: Translate ligand to the pocket center
             mol = translate_ligand_to_pocket_center(mol, pocket_center)
+            print(mol)
 
             # Step 3: Write the modified molecule back to the SDF file
             writer.write(mol)
@@ -139,6 +140,8 @@ def calculate_qvina2_score(receptor_file, sdf_file, out_dir, size=20,
 
     receptor_file = Path(receptor_file)
     sdf_file = Path(sdf_file)
+    new_sdf_filename = Path( str(Path(sdf_file).with_name(Path(sdf_file).stem + "_new" + Path(sdf_file).suffix)))
+
 
 
 # custom testing code
@@ -149,7 +152,8 @@ def calculate_qvina2_score(receptor_file, sdf_file, out_dir, size=20,
     print(f">>> Pocket center: {pocket_center}")
 
     # Process the SDF file
-    process_sdf_file(sdf_file, pocket_center)
+    process_sdf_file(sdf_file, new_sdf_filename, pocket_center)
+    sdf_file = new_sdf_filename
 # ===================================
 
 
@@ -185,12 +189,13 @@ def calculate_qvina2_score(receptor_file, sdf_file, out_dir, size=20,
 
             # run QuickVina 2
             out = os.popen(
-                f'./qvina/qvina2.1 --receptor {receptor_pdbqt_file} '
+                f'./analysis/qvina/qvina2.1 --receptor {receptor_pdbqt_file} '
                 f'--ligand {ligand_pdbqt_file} '
                 f'--center_x {cx:.4f} --center_y {cy:.4f} --center_z {cz:.4f} '
                 f'--size_x {size} --size_y {size} --size_z {size} '
                 f'--exhaustiveness {exhaustiveness}'
             ).read()
+            print(out)
 
             # clean up
             ligand_pdbqt_file.unlink()
